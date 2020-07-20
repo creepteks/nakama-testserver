@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	timestampOpcode int64 = 137
+	timestampOp_tick int64 = 0
 )
 
 var left int = 0
@@ -39,13 +39,11 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	// if err := initializer.RegisterAfterGetAccount(afterGetAccount); err != nil {
 	// 	return err
 	// }
-	if err := initializer.RegisterMatch("davaaPvP", func(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule) (runtime.Match, error) {
-		return &Match{}, nil
-	}); err != nil {
+	if err := initializer.RegisterMatch("davaaPvP", CreateMatchInternal); err != nil {
 		return err
 	}
 
-	if err := initializer.RegisterMatchmakerMatched(MakeMatch); err != nil {
+	if err := initializer.RegisterMatchmakerMatched(DoMatchmaking); err != nil {
 		logger.Error("Unable to register: %v", err)
 		return err
 	}
@@ -64,7 +62,7 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	return nil
 }
 
-func MakeMatch(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, entries []runtime.MatchmakerEntry) (string, error) {
+func DoMatchmaking(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, entries []runtime.MatchmakerEntry) (string, error) {
 	for _, e := range entries {
 		logger.Info("Matched user '%s' named '%s'", e.GetPresence().GetUserId(), e.GetPresence().GetUsername())
 		for k, v := range e.GetProperties() {
@@ -78,6 +76,10 @@ func MakeMatch(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtim
 	}
 
 	return matchId, nil
+}
+
+func CreateMatchInternal(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule) (runtime.Match, error) {
+	return &Match{}, nil
 }
 
 // func rpcEcho(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runtime.NakamaModule, payload string) (string, error) {
@@ -186,7 +188,7 @@ func (m *Match) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.DB
 
 	var bytes, _ = json.Marshal(tick)
 	if tick%20 == 0 {
-		dispatcher.BroadcastMessage(timestampOpcode, bytes, nil, nil, true)
+		dispatcher.BroadcastMessage(timestampOp_tick, bytes, nil, nil, true)
 	}
 
 	for _, message := range messages {
@@ -195,7 +197,7 @@ func (m *Match) MatchLoop(ctx context.Context, logger runtime.Logger, db *sql.DB
 		if state.(*MatchState).debug {
 			logger.Info("Received %v from %v to ", string(message.GetData()), message.GetUsername(), target.GetUsername())
 		}
-		dispatcher.BroadcastMessage(message.GetOpCode(), message.GetData(), []runtime.Presence{target}, nil, true)
+		dispatcher.BroadcastMessage(message.GetOpCode(), message.GetData(), []runtime.Presence{target}, nil, false)
 	}
 	return mState
 }
